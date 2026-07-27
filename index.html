@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>記憶力テスト｜数字は何桁まで、場所は何手まで覚えられるか</title>
+<meta name="description" content="数字の順唱・逆唱と、光った場所をたどる視空間記憶。3課題であなたの記憶のスパンを測ります。10問固定ではなく、正解するほど長くなる階段法。約3分・登録不要・すべて端末内で動作。">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://d-studylab.com/memory-test/">
+<meta property="og:title" content="記憶力テスト｜数字は何桁まで、場所は何手まで覚えられるか">
+<meta property="og:description" content="順唱・逆唱・視空間の3課題で記憶のスパンを測る。正解するほど長くなるので、限界が出ます。約3分・登録不要。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://d-studylab.com/memory-test/">
+<meta property="og:image" content="https://d-studylab.com/memory-test/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root { --bg:#0f1216; --panel:#171b21; --line:#2a323c; --txt:#e6e9ee; --sub:#9aa4b1;
+          --acc:#7cc4ff; --good:#6bdf9a; --bad:#ff9b8a; --gold:#ffcf6b; --lit:#ffd86b; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f4f6f8; --panel:#fff; --line:#dde3ea; --txt:#1b2027; --sub:#5b6673;
+            --acc:#1f6fb2; --good:#1f8a52; --bad:#c0492f; --gold:#a6791b; --lit:#f0a800; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); line-height:1.7;
+         font-family:"Segoe UI","Yu Gothic UI",Meiryo,sans-serif; overflow-x:hidden; }
+  .wrap { max-width:640px; margin:0 auto; padding:16px 16px 60px; }
+  h1 { font-size:20px; margin:8px 0 2px; }
+  .sub { color:var(--sub); font-size:13px; margin-bottom:16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+           padding:16px; margin-bottom:14px; }
+  .panel h2 { font-size:14px; margin:0 0 10px; color:var(--sub); }
+  button { background:var(--acc); color:#08202f; border:0; border-radius:10px;
+           padding:12px 22px; font-size:15px; font-weight:bold; cursor:pointer;
+           min-height:44px; font-family:inherit; }
+  button.ghost { background:transparent; color:var(--acc); border:1px solid var(--acc); font-weight:normal; }
+  button:disabled { opacity:.35; cursor:default; }
+  @media (prefers-color-scheme: light) { button { color:#fff; } button.ghost { color:var(--acc); } }
+  .hide { display:none !important; }
+
+  .task { text-align:center; }
+  .taskname { font-size:13px; color:var(--sub); letter-spacing:.06em; }
+  .prog { font-size:12px; color:var(--sub); margin-top:2px; }
+  /* 数字の提示 */
+  .stage { display:flex; align-items:center; justify-content:center;
+           min-height:170px; margin:8px 0; }
+  .bigdigit { font-size:76px; font-weight:bold; font-variant-numeric:tabular-nums;
+              letter-spacing:.04em; line-height:1; color:var(--lit); }
+  .ready { font-size:19px; color:var(--sub); }
+  /* 位置課題のグリッド */
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+          max-width:290px; margin:0 auto; }
+  .cell { aspect-ratio:1/1; border:2px solid var(--line); border-radius:12px;
+          background:var(--panel); cursor:pointer; transition:background .06s, border-color .06s;
+          display:flex; align-items:center; justify-content:center; font-size:22px;
+          font-weight:bold; color:#08202f; }
+  .cell.lit { background:var(--lit); border-color:var(--lit); }
+  .cell.tapped { background:var(--acc); border-color:var(--acc); }
+  .cell.show { pointer-events:none; }
+  /* 入力欄 */
+  .keys { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; max-width:340px; margin:10px auto 0; }
+  .keys button { padding:0; min-height:52px; font-size:20px; background:var(--panel);
+                 color:var(--txt); border:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  .keys button.wide { grid-column:span 2; font-size:14px; }
+  .typed { font-size:30px; font-variant-numeric:tabular-nums; letter-spacing:.14em;
+           min-height:44px; color:var(--acc); word-break:break-all; }
+  .hintline { font-size:13.5px; color:var(--sub); min-height:22px; }
+  .flash { font-size:15px; font-weight:bold; min-height:26px; }
+  .flash.ok { color:var(--good); } .flash.ng { color:var(--bad); }
+
+  .rules { font-size:14px; }
+  .rules li { margin-bottom:7px; }
+  .kinds { display:grid; gap:9px; margin:10px 0 4px; }
+  .kind { border:1px solid var(--line); border-radius:10px; padding:11px 13px; background:var(--bg); }
+  .kind b { color:var(--acc); }
+  .kind span { display:block; font-size:13px; color:var(--sub); }
+
+  .res { text-align:center; }
+  .hval { font-size:56px; font-weight:bold; line-height:1.05; color:var(--gold);
+          font-variant-numeric:tabular-nums; }
+  .htitle { font-size:19px; font-weight:bold; margin:2px 0 12px; }
+  .spans { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 6px; }
+  .span1 { flex:1 1 30%; border:1px solid var(--line); border-radius:10px; padding:10px 6px; }
+  .span1 b { display:block; font-size:26px; color:var(--acc); font-variant-numeric:tabular-nums; }
+  .span1 small { color:var(--sub); font-size:11.5px; display:block; }
+  .weak { font-size:14px; color:var(--txt); background:var(--bg); border:1px solid var(--line);
+          border-radius:10px; padding:11px 13px; margin:10px 0; text-align:left; }
+  .note { font-size:12px; color:var(--sub); margin-top:16px; border-top:1px solid var(--line); padding-top:10px; }
+  .note a { color:var(--acc); }
+  .copied { font-size:12px; color:var(--good); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== タイトル ===== -->
+  <div id="scr-title">
+    <h1>🧠 記憶力テスト</h1>
+    <div class="sub">数字は何桁まで、場所は何手まで覚えられるか。約3分・登録不要・すべて端末内で動きます。</div>
+
+    <div class="panel">
+      <h2>3つの課題を続けて測ります</h2>
+      <div class="kinds">
+        <div class="kind"><b>① 順唱</b><span>数字が1つずつ出ます。出た順に答えます。</span></div>
+        <div class="kind"><b>② 逆唱</b><span>同じように出ますが、<b>逆から</b>答えます。ここが本番です。</span></div>
+        <div class="kind"><b>③ 場所</b><span>マスが順に光ります。同じ順にタップします。</span></div>
+      </div>
+      <ul class="rules">
+        <li><b>10問固定ではありません。</b>正解するたびに1つ長くなります。</li>
+        <li>同じ長さで2回まちがえたら、その課題は終わりです。</li>
+        <li>だから<b>必ず最後はまちがえます</b>。そこがあなたの限界です。</li>
+      </ul>
+      <div style="text-align:center;margin-top:14px">
+        <button id="start">テストを始める</button>
+      </div>
+    </div>
+    <div class="note">
+      偏差値はこのテストの採点モデルによる<b>擬似値</b>です（全国調査ではありません）。
+      課題は心理学で使われる数唱スパンと Corsi ブロック課題をもとにしています。順唱の目安「7±2」は Miller (1956) の古典的な指摘です。<br>
+      ほかのゲーム → <a href="/games/">ミニゲームゲームズ</a> ・ <a href="/">D-studyLab</a>
+    </div>
+  </div>
+
+  <!-- ===== 出題 ===== -->
+  <div id="scr-play" class="hide">
+    <div class="task">
+      <div class="taskname" id="taskname">—</div>
+      <div class="prog" id="prog">—</div>
+      <div class="stage" id="stage"><div class="ready" id="ready">用意…</div></div>
+      <div class="hintline" id="hint"></div>
+      <div class="typed" id="typed"></div>
+      <div class="keys hide" id="keys"></div>
+      <div class="flash" id="flash"></div>
+    </div>
+  </div>
+
+  <!-- ===== 結果 ===== -->
+  <div id="scr-res" class="hide">
+    <div class="panel res">
+      <div class="taskname">記憶の偏差値</div>
+      <div class="hval" id="hval">—</div>
+      <div class="htitle" id="htitle">—</div>
+      <div class="spans">
+        <div class="span1"><b id="sD">—</b><small>順唱</small></div>
+        <div class="span1"><b id="sR">—</b><small>逆唱</small></div>
+        <div class="span1"><b id="sC">—</b><small>場所</small></div>
+      </div>
+      <div class="weak" id="weak">—</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px">
+        <button id="again">もう一度（別の問題）</button>
+        <button class="ghost" id="copy">結果をコピー</button>
+      </div>
+      <div class="copied" id="copied"></div>
+    </div>
+    <div class="panel">
+      <h2>この数字の読み方</h2>
+      <p style="font-size:14px;margin:0 0 8px">
+        健康な成人の目安は、<b>順唱7前後・逆唱5前後・場所5前後</b>とされています。
+        順唱と逆唱の差が大きい人は、<b>覚える力より「頭の中で操作する力」</b>のほうが弱いということです。
+        買い物メモを見ずに回れるかどうかは、じつは順唱よりこちらが効きます。
+      </p>
+      <p style="font-size:14px;margin:0">
+        逆に場所だけ高い人は、覚えたいものを<b>部屋の風景に置いていく</b>やり方（場所法）が向いています。
+      </p>
+    </div>
+    <div class="note">
+      偏差値はこのテストの採点モデルによる擬似値です（全国調査ではありません）。<br>
+      ほかのゲーム → <a href="/games/">ミニゲームゲームズ</a> ・ <a href="/">D-studyLab</a>
+    </div>
+  </div>
+</div>
+
+<script src="memory.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var ORDER = ["digit", "rdigit", "corsi"];
+  var LABEL = { digit:"① 順唱 — 出た順に答える", rdigit:"② 逆唱 — 逆から答える", corsi:"③ 場所 — 光った順にタップ" };
+  var rng, stairs, idx, trial, input, showing, spans;
+
+  function reset() {
+    rng = MEM.mulberry((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
+    stairs = { digit: MEM.newStair("digit"), rdigit: MEM.newStair("rdigit"), corsi: MEM.newStair("corsi") };
+    idx = 0; spans = {};
+    show("play"); nextTrial();
+  }
+  function show(which) {
+    $("scr-title").classList.toggle("hide", which !== "title");
+    $("scr-play").classList.toggle("hide", which !== "play");
+    $("scr-res").classList.toggle("hide", which !== "res");
+  }
+
+  function nextTrial() {
+    // 終わった課題は飛ばす
+    while (idx < ORDER.length && stairs[ORDER[idx]].done) {
+      spans[ORDER[idx]] = stairs[ORDER[idx]].best; idx++;
+    }
+    if (idx >= ORDER.length) return finish();
+    var kind = ORDER[idx], st = stairs[kind];
+    trial = MEM.makeTrial(kind, st.len, rng, 9);
+    input = [];
+    $("taskname").textContent = LABEL[kind];
+    $("prog").textContent = "いまの長さ " + st.len + " ／ あと " + (MEM.MISS_TO_END - st.miss) + " 回まちがえると終わり";
+    $("typed").textContent = "";
+    $("flash").textContent = ""; $("flash").className = "flash";
+    $("keys").classList.add("hide");
+    $("hint").textContent = "";
+    present();
+  }
+
+  // ---- 提示 ----
+  function present() {
+    showing = true;
+    var stage = $("stage");
+    if (trial.kind === "corsi") {
+      stage.innerHTML = '<div class="grid show" id="grid"></div>';
+      var g = $("grid");
+      for (var i = 0; i < 9; i++) { var c = document.createElement("div"); c.className = "cell"; c.dataset.i = i; g.appendChild(c); }
+      $("hint").textContent = "よく見て…";
+      var k = 0;
+      (function step() {
+        if (k >= trial.seq.length) { setTimeout(startInput, 400); return; }
+        var cell = g.children[trial.seq[k]];
+        cell.classList.add("lit");
+        setTimeout(function () { cell.classList.remove("lit"); k++; setTimeout(step, 220); }, 520);
+      })();
+    } else {
+      stage.innerHTML = '<div class="bigdigit" id="bd"></div>';
+      $("hint").textContent = trial.kind === "rdigit" ? "逆から答えます" : "出た順に答えます";
+      var j = 0;
+      (function step() {
+        if (j >= trial.seq.length) { $("bd").textContent = ""; setTimeout(startInput, 350); return; }
+        $("bd").textContent = trial.seq[j];
+        setTimeout(function () { $("bd").textContent = ""; j++; setTimeout(step, 180); }, 700);
+      })();
+    }
+  }
+
+  // ---- 回答 ----
+  function startInput() {
+    showing = false;
+    if (trial.kind === "corsi") {
+      $("hint").textContent = "光った順にタップ";
+      var g = $("grid");
+      g.classList.remove("show");
+      for (var i = 0; i < 9; i++) {
+        (function (cell, ci) {
+          cell.onclick = function () {
+            if (showing) return;
+            input.push(ci);
+            cell.classList.add("tapped");
+            setTimeout(function () { cell.classList.remove("tapped"); }, 160);
+            $("typed").textContent = "●".repeat(input.length);
+            if (input.length >= trial.answer.length) judge();
+          };
+        })(g.children[i], i);
+      }
+    } else {
+      $("hint").textContent = trial.kind === "rdigit" ? "最後に出たものから順に" : "最初に出たものから順に";
+      $("stage").innerHTML = '<div class="ready">数字を押してください</div>';
+      var keys = $("keys");
+      keys.innerHTML = ""; keys.classList.remove("hide");
+      for (var d = 0; d <= 9; d++) {
+        (function (n) {
+          var b = document.createElement("button");
+          b.textContent = n;
+          b.onclick = function () {
+            if (input.length >= trial.answer.length) return;
+            input.push(n); $("typed").textContent = input.join(" ");
+            if (input.length >= trial.answer.length) judge();
+          };
+          keys.appendChild(b);
+        })(d);
+      }
+      var back = document.createElement("button");
+      back.className = "wide"; back.textContent = "1つ消す";
+      back.onclick = function () { input.pop(); $("typed").textContent = input.join(" "); };
+      keys.appendChild(back);
+    }
+  }
+
+  function judge() {
+    var ok = MEM.isCorrect(trial, input);
+    var kind = trial.kind;
+    stairs[kind] = MEM.advance(stairs[kind], ok);
+    var f = $("flash");
+    f.className = "flash " + (ok ? "ok" : "ng");
+    f.textContent = ok ? "正解！ もう1つ長くします"
+                       : "おしい。正解は " + (kind === "corsi" ? "光った順どおり" : trial.answer.join(" "));
+    $("keys").classList.add("hide");
+    setTimeout(nextTrial, ok ? 800 : 1500);
+  }
+
+  function finish() {
+    ORDER.forEach(function (k) { if (spans[k] === undefined) spans[k] = stairs[k].best; });
+    var h = MEM.hensachi(spans);
+    $("hval").textContent = h;
+    $("htitle").textContent = MEM.title(h);
+    $("sD").textContent = spans.digit; $("sR").textContent = spans.rdigit; $("sC").textContent = spans.corsi;
+    $("weak").textContent = MEM.weakness(spans);
+    $("copied").textContent = "";
+    show("res");
+  }
+
+  $("start").onclick = reset;
+  $("again").onclick = reset;
+  $("copy").onclick = function () {
+    var t = "🧠 記憶力テスト\n偏差値 " + $("hval").textContent + "（" + $("htitle").textContent + "）\n" +
+            "順唱 " + spans.digit + "／逆唱 " + spans.rdigit + "／場所 " + spans.corsi + "\n" +
+            "https://d-studylab.com/memory-test/";
+    var done = function () { $("copied").textContent = "コピーしました"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, fb);
+    else fb();
+    function fb() {
+      var ta = document.createElement("textarea"); ta.value = t;
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { $("copied").textContent = "コピーできませんでした"; }
+      document.body.removeChild(ta);
+    }
+  };
+})();
+</script>
+</body>
+</html>
