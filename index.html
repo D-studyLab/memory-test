@@ -95,6 +95,192 @@
   .about h2:first-child { margin-top:0; }
   .about p { margin:0 0 8px; font-size:11.5px; }
 </style>
+<script id="dsl-card">
+/* ════════════════════════════════════════════════════════════════════
+   D-studyLab 共通「結果カード」── 診断・テストの結果を貼れる画像にする
+   2026-08-17 作成 ／ 正本 = _Tools/_shared/result_card.js
+
+   ■ なぜ要るか
+     診断・テストは **遊んだ人が結果を貼ってくれる** ことで広がる。
+     フォロワー0でも広がる、数少ない構造。
+     ところが公開中の3本を調べたら、**いちばん貼られやすい2本に貼る手段が無かった**
+     （空間認識偏差値テスト＝「偏差値◯◯」／記憶力テスト＝「何桁覚えられたか」）。
+     数字は持っているのに、出す口が無い状態だった。
+
+   ■ 決めたこと
+     ・**1080×1080の正方形。** SNSでいちばん切れにくい
+     ・**外部の部品を使わない。** canvas だけ。ゲームは index.html 1枚で配信しているため
+     ・**主役は数字ひとつ。** 貼られる画像は、開いた瞬間に何の数字か分かる必要がある
+     ・文字は日本語なので単語で折れない → 1文字ずつ測って折る
+     ・**送信しない。** 画像は端末の中で作って、そのまま保存する
+
+   ■ 使い方
+     DSLCard.save({
+       app:   '空間認識偏差値テスト',      // 上の小さい見出し
+       big:   '62.4',                     // 主役の数字
+       bigLabel: '偏差値',                // 数字の左肩
+       title: '頭の中で回せる人',          // 称号
+       stats: [{v:'4/4', k:'回転'}, ...],  // 最大4つ
+       note:  '10問・3分',
+       url:   'd-studylab.com/kukan-test/',
+       theme: 'dark' | 'light' | {bg,card,accent,text,sub}
+     }, 'ファイル名.png')
+   ════════════════════════════════════════════════════════════════════ */
+(function (global) {
+  "use strict";
+
+  var THEMES = {
+    dark:  { bg: "#111722", card: "#1b2436", accent: "#7cc4ff",
+             text: "#eef3fb", sub: "#93a1b8", onAccent: "#08202f" },
+    light: { bg: "#efe8d8", card: "#ffffff", accent: "#8A5A33",
+             text: "#221c14", sub: "#6b6250", onAccent: "#ffffff" },
+    warm:  { bg: "#1d1712", card: "#2a2118", accent: "#e8c35a",
+             text: "#f2e8d8", sub: "#ab9c86", onAccent: "#231a10" }
+  };
+
+  function F(w, px) {
+    return w + " " + px + 'px "Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif';
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);         c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  /* 日本語は単語で切れないので1文字ずつ幅を測って折る。
+     measure=true なら描かずに必要な高さだけ返す（先に枠の大きさを決めるため）。 */
+  function wrap(c, text, x, y, maxW, lh, measure) {
+    var line = "", n = 0;
+    var put = function () { if (!measure) c.fillText(line, x, y + n * lh); n++; };
+    var s = String(text == null ? "" : text);
+    for (var i = 0; i < s.length; i++) {
+      var ch = s[i];
+      if (c.measureText(line + ch).width > maxW && line) { put(); line = ch; }
+      else { line += ch; }
+    }
+    if (line) put();
+    return measure ? n * lh : y + n * lh;
+  }
+
+  function draw(o) {
+    var col = typeof o.theme === "object" ? o.theme : (THEMES[o.theme] || THEMES.dark);
+    var W = 1080, H = 1080, S = 2;
+    var cv = document.createElement("canvas");
+    cv.width = W * S; cv.height = H * S;
+    var c = cv.getContext("2d");
+    c.scale(S, S);
+
+    var PAD = 76;               // カードの外側の余白
+    var IN = PAD + 52;          // 文字の左端
+    var CW = W - IN * 2;        // 文字が使える幅
+    var stats = (o.stats || []).slice(0, 4);
+
+    /* ⚠ 先に高さを測ってから枠を描く。
+       固定の高さにすると、中身が短いときに**下半分が空いて未完成に見える**
+       （2026-08-17 に一度そうなった）。 */
+    var TITLE_LH = 76, NOTE_LH = 40, STATS_H = 132;
+    c.font = F(900, 62);
+    var titleH = o.title ? wrap(c, "「" + o.title + "」", 0, 0, CW, TITLE_LH, true) : 0;
+    c.font = F(700, 28);
+    var noteH = o.note ? wrap(c, o.note, 0, 0, CW, NOTE_LH, true) : 0;
+
+    var contentH = 96                       // アプリ名＋下線
+                 + 190                      // 主役の数字
+                 + (titleH ? titleH + 22 : 0)
+                 + (stats.length ? STATS_H + 40 : 0)
+                 + (noteH ? noteH + 18 : 0);
+    var cardH = contentH + 130;             // 上下の内側余白
+    var cardTop = Math.max(70, (H - 70 - cardH) / 2);   // 縦に中央寄せ
+
+    c.fillStyle = col.bg; c.fillRect(0, 0, W, H);
+    c.fillStyle = col.accent; c.fillRect(0, 0, W, 22);      // 上の帯
+
+    c.fillStyle = col.card;
+    roundRect(c, PAD, cardTop, W - PAD * 2, cardH, 38); c.fill();
+
+    var y = cardTop + 76;
+
+    // アプリ名（小さく・下線）
+    c.fillStyle = col.accent; c.font = F(900, 28);
+    c.fillText(String(o.app || ""), IN, y);
+    c.fillRect(IN, y + 22, 76, 6);
+    y += 96;
+
+    // ★ 主役の数字。開いた瞬間に何の数字か分かるようにする
+    y += 150;                                // ベースライン
+    c.fillStyle = col.text;
+    c.font = F(900, 190);
+    var bigW = c.measureText(String(o.big)).width;
+    c.fillText(String(o.big), IN, y);
+    if (o.bigLabel) {
+      c.fillStyle = col.sub; c.font = F(900, 40);
+      c.fillText(String(o.bigLabel), IN + bigW + 24, y - 8);
+    }
+    y += 40;
+
+    // 称号
+    if (titleH) {
+      c.fillStyle = col.accent; c.font = F(900, 62);
+      wrap(c, "「" + o.title + "」", IN, y + 44, CW, TITLE_LH);
+      y += titleH + 22;
+    }
+
+    // 内訳（最大4つ・横並び）
+    if (stats.length) {
+      y += 34;
+      var gap = 16;
+      var boxW = (CW - gap * (stats.length - 1)) / stats.length;
+      for (var i = 0; i < stats.length; i++) {
+        var x = IN + i * (boxW + gap);
+        c.fillStyle = col.bg;
+        roundRect(c, x, y, boxW, STATS_H, 20); c.fill();
+        c.fillStyle = col.text; c.font = F(900, 46);
+        c.textAlign = "center";
+        c.fillText(String(stats[i].v), x + boxW / 2, y + 66);
+        c.fillStyle = col.sub; c.font = F(700, 24);
+        c.fillText(String(stats[i].k), x + boxW / 2, y + 104);
+        c.textAlign = "left";
+      }
+      y += STATS_H + 6;
+    }
+
+    // 補足
+    if (noteH) {
+      c.fillStyle = col.sub; c.font = F(700, 28);
+      wrap(c, o.note, IN, y + 46, CW, NOTE_LH);
+    }
+
+    // 下のURL
+    c.fillStyle = col.sub; c.font = F(900, 30);
+    c.fillText(String(o.url || "d-studylab.com"), PAD, H - 44);
+
+    return cv;
+  }
+
+  function save(o, filename) {
+    var cv;
+    try { cv = draw(o); } catch (e) { return false; }
+    // ⚠ toBlob が無い環境（古いSafari等）では toDataURL に落とす。
+    //    ここで落ちると「押しても何も起きない」になるので、必ず両方持つ。
+    var name = filename || ((o.app || "result") + ".png");
+    function go(href, revoke) {
+      var a = document.createElement("a");
+      a.href = href; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      if (revoke) setTimeout(function () { URL.revokeObjectURL(href); }, 4000);
+    }
+    if (cv.toBlob) cv.toBlob(function (b) { go(URL.createObjectURL(b), true); }, "image/png");
+    else go(cv.toDataURL("image/png"), false);
+    return true;
+  }
+
+  global.DSLCard = { save: save, draw: draw, themes: THEMES };
+})(window);
+
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -167,8 +353,9 @@
       </div>
       <div class="weak" id="weak">—</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px">
-        <button id="again">もう一度（別の問題）</button>
-        <button class="ghost" id="copy">結果をコピー</button>
+        <button id="saveimg">結果を画像で保存する</button>
+        <button class="ghost" id="again">もう一度（別の問題）</button>
+        <button class="ghost" id="copy">文字でコピー</button>
       </div>
       <div class="copied" id="copied"></div>
     </div>
@@ -321,11 +508,32 @@
     $("sD").textContent = spans.digit; $("sR").textContent = spans.rdigit; $("sC").textContent = spans.corsi;
     $("weak").textContent = MEM.weakness(spans);
     $("copied").textContent = "";
+
+    // 貼れる画像にするための材料。文字のコピーだけだと、まず貼られない。
+    window._card = {
+      app: "記憶力テスト",
+      big: String(h),
+      bigLabel: "偏差値",
+      title: MEM.title(h),
+      stats: [
+        { v: spans.digit + "桁",  k: "順唱" },
+        { v: spans.rdigit + "桁", k: "逆唱" },
+        { v: spans.corsi + "手",  k: "場所" }
+      ],
+      note: MEM.weakness(spans),
+      url: "d-studylab.com/memory-test/",
+      theme: "dark"
+    };
     show("res");
   }
 
   $("start").onclick = reset;
   $("again").onclick = reset;
+  $("saveimg").onclick = function () {
+    if (!window._card || !window.DSLCard) return;
+    var ok = DSLCard.save(window._card, "記憶力テスト_偏差値" + window._card.big + ".png");
+    $("copied").textContent = ok ? "画像を保存しました" : "画像を作れませんでした";
+  };
   $("copy").onclick = function () {
     var t = "🧠 記憶力テスト\n偏差値 " + $("hval").textContent + "（" + $("htitle").textContent + "）\n" +
             "順唱 " + spans.digit + "／逆唱 " + spans.rdigit + "／場所 " + spans.corsi + "\n" +
