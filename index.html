@@ -303,6 +303,7 @@
     var ok = MEM.isCorrect(trial, input);
     var kind = trial.kind;
     stairs[kind] = MEM.advance(stairs[kind], ok);
+    if (window.SND) ok ? SND.ok() : SND.ng();
     var f = $("flash");
     f.className = "flash " + (ok ? "ok" : "ng");
     f.textContent = ok ? "正解！ もう1つ長くします"
@@ -312,6 +313,7 @@
   }
 
   function finish() {
+    if (window.SND) SND.win();          // 3課題ぜんぶ終わって結果が出るところ
     ORDER.forEach(function (k) { if (spans[k] === undefined) spans[k] = stairs[k].best; });
     var h = MEM.hensachi(spans);
     $("hval").textContent = h;
@@ -537,13 +539,29 @@
      各ゲームは作りがばらばらなので、まず「押したら鳴る」だけを
      イベント委譲でまとめて付ける。ゲーム固有の音（正解・勝敗）は
      そのゲームの中から SND.ok() などを呼んで足す。            */
+  var CLICKABLE = "button,[role=button],.btn,a[href],summary," +
+                  "input[type=button],input[type=submit],label,[onclick]";
+
+  /** これは押せるものか。
+      ⚠ セレクタだけでは足りない。モンティホールのドアのように
+         <div class="door"> に onclick を **JSから** 付けている作りが多く、
+         その場合 [onclick] 属性は無い。実際 2026-08-16 に取りこぼした。
+         → 祖先を数段さかのぼって、onclick を持つか cursor:pointer かで判断する。 */
+  function isClickable(t) {
+    if (t.closest(CLICKABLE)) return true;
+    for (var el = t, i = 0; el && el.nodeType === 1 && i < 5; el = el.parentElement, i++) {
+      if (el.onclick) return true;
+      try { if (getComputedStyle(el).cursor === "pointer") return true; } catch (e) {}
+    }
+    return false;
+  }
+
   function autoWire() {
     document.addEventListener("pointerdown", function (e) {
       var t = e.target;
       if (!t || !t.closest) return;
       if (t.closest("#dslSndBtn")) return;                    // トグル自身は二重に鳴らさない
-      if (t.closest("button,[role=button],.btn,a[href],summary,input[type=button],input[type=submit],label"))
-        SND.click();
+      if (isClickable(t)) SND.click();
     }, true);
     document.addEventListener("keydown", function (e) {
       if (e.repeat) return;
